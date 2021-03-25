@@ -1,0 +1,131 @@
+PART 1) Getting Greenworks SDK to work on Electron on Windows (should be similar for others):
+
+This is confirmed to work with the following versions:
+Electron v11.4.0
+Steamworks SDK 1.5.0
+Greenworks prebuild v85 for electron version 11.0.0 - > 11.4.1 from 
+https://greenworks-prebuilds.armaldio.xyz/
+
+Prerequisites:
+
+First, I suggest building a test electron app based on instructions to get greenworks running, and after that adjust it to any custom electron project structures you might be using.
+
+
+1) Follow steps 1-4 here:
+https://github.com/greenheartgames/greenworks/blob/master/docs/build-instructions-electron.md
+
+2) After this, do the steps noted at the "using prebuilt".
+
+Follow the instructions, however don't use the exact links noted here as they are outdated and not confirmed to work.
+Instead, you should download the prebuilt *.node file from  https://greenworks-prebuilds.armaldio.xyz/
+
+On the left at filters, choose Steamworks v1.43 release tag, windows OS & Runtiem electron. Then you should see builds from 22nd Nov 2020 for electron/windows.
+ABI: v85 (Version range = 11.0.0-beta.11 -> 11.4.1)
+
+Download the 64/32 bits per your needs, I just did both. This will give you your correct/updated *.node files
+
+
+3) Download the steamworks 1.50 SDK from https://partner.steamgames.com/downloads/list
+Copy the files from this SDK as instructed under "Using prebuilt". However, in my case, I also had to copy the .lib files as well as .dll to get it working!
+I suggest to just copy both types for the architecture you are using, and out the in the lib folder.
+**** After copying, Make sure ALL  files in your lib folder are from the year 2020+, as otherwise things won't work!! ****
+
+4) Continue steps 9 - 11 on https://github.com/greenheartgames/greenworks/blob/master/docs/build-instructions-electron.md
+However, there are some extra notes here to keep in mind, that I'll write about below, as likely at this point you will still be running into some issues.
+
+5) Where should your folders/structures be? Well, if you are using prebuilt, it's good to clear something up:
+You DON'T need to access the greenworks.js file from node_modules/greenworks/greenworks.js - you can move the greenworks.js file "anywhere" it fits your project structure,
+i.e. in you can also have it in project root where your main.js/renderer.js is. But whereever you are accessing it from, in the same folder where there is greenworks.js is where you should also have the lib folder with all those dll, lib & node files we copied earlier, as well as the steam_appid.txt file
+
+
+6) If you were doing this test project and following step 1-4, and kept your greenworks.js in node_modules/greenworks, you are very likely going to have to do a few alterations to paths, as for me using the samples didn't work directly.
+
+In the renderer.js, around line 15-20 change the path to greenworks in catch phrase, to be like this:
+
+try {
+// if greenworks is installed in a node_modules folder, this will work <- IT WON'T REALLY :D
+greenworks = require('greenworks');
+} catch(e) {
+// BUT THIS SHOULD!
+greenworks = require('./node_modules/greenworks');
+}
+
+7) At this point if you try to start your app, you will likely run into several or all of these errors, here is how you solve them:
+* I'm paraphrasing the errors from memory, I will make a more detailed tutorial with exact error in the near future
+
+7.1) "require is not a command" <- to solve this, in your main.js process file, you will have to add this part of code to whereever browser window is created (might be slightly different depending on what starting template you are using):
+const mainWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {		
+      preload: path.join(__dirname, 'preload.js'),
+	  nodeIntegration: true, // ADD THIS!!!
+      contextIsolation: false, /// ADD THIS as well, seems to be needed in some cases, btu maybe not always
+    }
+  })
+
+7.2) In your package.json, if you are building your app, you should add this config:
+add this to package.json in root
+"build": {
+  "files": [
+    "!node_modules/greenworks/deps/**/*"
+  ]
+}
+
+7.3) If you get some error about allowRenderProcess, then add this in your app.js/renderer.js, after app is imported:
+app.allowRendererProcessReuse = false;
+
+7.4) Make sure you are running electron v 11.4.0. You can update it like so:
+npm install electron@11.4.0
+
+You can test if you are running the correct version by typing:
+electron --version
+
+If its not correct, you might have to try installing the version globally (careful, it might affect any other apps, possibly?)
+npm install electron@11.4.0 -g
+
+While installing it, you might get some errors that some moduels are missing. Follow instructions to install them, then repeat these commands.
+
+7.5) If you got up to this point, greenworks should now be connected, and you should see logs/connections info in the sample app! If you are still running into some errors, I highly suggest having a look if these are any of them:
+https://hudell.com/greenworks-mz/
+
+There's a bunch noted on this website, which can help you point in the right direction (i.e. maybe you missed copying a file or messed up one of the above steps)
+
+8) From here onwards you are likely to run into some more integration issues with the overlay on Electron - I will follow up on how to solve these when we sort them out. But the point up to this point seems to be the most frustratign and the least clear, and one that can waste you a lot of days - but hopefully not with this info you now have :)
+
+9) Other random errors/issues you might encounter while setting up above stuff, you may or may not get all of them, or you may also get more when installing modules you don't have, or MS VS, or python... Here's how I solved some of them. 
+* IMPORTANT: I am not an electron expert, and some of these might be redundant and probably redundant. I am just writign down random steps I took to help me resolve these issues!
+
+9.1) Do EVERYTHING while running command prompt in administrative mode while installing things - otherwise some things won't work!
+
+9.2) Python path/python not found:
+npm --add-python-to-path='true' --debug install --global windows-build-tools
+npm config set python "%USERPROFILE%\.windows-build-tools\python27\python.exe" 
+npm config set python C:\Users\{Your windows profile name here}\.windows-build-tools\python27\python.exe  (if above one doesn't work try this one)
+
+
+I also recommend setting ENV path for PYTHON in windows (google how to do this) as it helped resolve the issue for me.
+
+Here are some other steps I did, if above don't solve it for you. But I think above 3 should be enough in most cases.
+https://stackoverflow.com/questions/15126050/running-python-on-windows-for-node-js-dependencies
+
+9.3) You might also get errors for microsoft visual errors, or missing modules -> for those I suggest just to read the logs printed as in most situation they present the solution, and you just need to do:
+
+npm install missingModuleName
+
+After installing the missing module, retry starting the app/running npm install, it's usually an iterative process as several things might be missing
+
+10) Other notes:
+As long as greenworks is not at least initializing, you DO NOT need to test anything in actual steam environment. If you are using the sample renderer.js, you should at the very least get to the log of "Error on initializing steam API." . Any logs/errors before that, mean that there's an issue with your project/paths/lib/dlls setup.
+
+For me, after those were sorted, It also showed steam API data for me, WITHOUT beign connected or running the app through steam.
+
+I haven't gotten to this yet, but after you got that working, here are some extra tips (props to @BermudaCake for summing them up), things you'll likely have to do to get the overlay fully functional (I will prepare a detailed guide when we sort this out ourselves):
+
+- Make sure you have your window refreshing frequently, if you're doing an HTML game this is probably the case as you're hooking into requestAnimationFrame to get a new frame. Unless your game is actually a static website this shouldn't matter.
+- Actually build the game (I used electron-forge for this)
+- Add the game as a non-steam game to your library
+- Copy paste this into the LAUNCH OPTIONS box: --in-process-gpu --disable-direct-composition
+
+
+
